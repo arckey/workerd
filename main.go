@@ -4,22 +4,20 @@ import (
 	"os"
 
 	"github.com/arckey/workerd/pkg/client"
-	"github.com/arckey/workerd/pkg/config" // loads configuration
-	"github.com/arckey/workerd/pkg/drivers"
+	"github.com/arckey/workerd/pkg/config"
+	"github.com/arckey/workerd/pkg/drivers/virtualbox"
 	"github.com/arckey/workerd/pkg/events"
-	"github.com/arckey/workerd/pkg/machine"
 	log "github.com/inconshreveable/log15"
 )
 
 const (
-	clientType = client.TypeTCP
-	driverType = drivers.Virtualbox
+	clientType = client.TCP
 )
 
 func main() {
 	// initialize client
-	log.Debug("creating client", "type", clientType)
-	c, err := client.New(client.TypeTCP, &client.Options{
+	log.Debug("creating client", "type", clientType, "pid", os.Getpid())
+	c, err := client.New(client.TCP, &client.Options{
 		HostAddr: config.Config.WMAddr,
 	})
 	if err != nil {
@@ -35,19 +33,25 @@ func main() {
 	log.Info("established connection to:", "host", config.Config.WMAddr)
 
 	// initialize driver
-	log.Debug("initializing driver driver", "type", driverType)
-	d, err := drivers.New(drivers.Virtualbox, nil)
+	log.Debug("initializing driver driver")
+	d, err := virtualbox.New(nil)
 	if err != nil {
-		log.Crit("failed to initialize driver", "type", driverType, "err", err)
+		log.Crit("failed to initialize driver", "err", err)
 		os.Exit(1)
 	}
 
-	log.Debug("validating virtual-machine exists:", "name", config.Config.MachineName)
-	m := machine.GetByName(config.Config.MachineName, d)
-	if _, err := m.GetInfo(); err != nil {
-		log.Crit("could not validate virtual-machine exists", "type", driverType, "name", config.Config.MachineName, "err", err)
+	m, err := d.GetMachineByName(config.Config.MachineName)
+	if err != nil {
+		log.Crit("could not get machine", "machine", config.Config.MachineName, "err", err)
 		os.Exit(1)
 	}
+
+	info, err := m.GetInfo()
+	if err != nil {
+		log.Crit("could not get machine info", "machine", config.Config.MachineName, "err", err)
+		os.Exit(1)
+	}
+	log.Info("found virtual-machine", "name", info.Metadata.Name, "state", info.Metadata.State)
 
 	log.Info("listening for events from worker-manager...", "host", config.Config.WMAddr)
 	for {
@@ -60,7 +64,7 @@ func main() {
 			}
 		case events.TypeStopMachine:
 			log.Info("Stopping machine", "machine", config.Config.MachineName)
-			if err := m.Start(); err != nil {
+			if err := m.Stop(); err != nil {
 				log.Error("failed to stop machine", "machine", config.Config.MachineName, "err", err)
 			}
 		case events.UnknownEventError:

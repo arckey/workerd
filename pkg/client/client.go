@@ -1,6 +1,14 @@
 package client
 
-import "github.com/arckey/workerd/pkg/events"
+import (
+	"errors"
+
+	"github.com/arckey/workerd/pkg/events"
+)
+
+var (
+	errClientDoesNotExists = errors.New("a client of the specified type does not exist")
+)
 
 // Client creates a connection to the specified host and allows subscribing for events
 type Client interface {
@@ -19,18 +27,24 @@ type Options struct {
 type Type uint8
 
 const (
-	// TypeTCP client that uses tcp
-	TypeTCP Type = iota
+	// TCP client that uses tcp
+	TCP Type = iota
+
+	// Signals client that is controlled by os signals
+	Signals
 )
+
+var clientsMap = map[Type]func(*Options) (Client, error){
+	TCP:     newTCPClient,
+	Signals: newSignalsClient,
+}
 
 // New creates a new client
 func New(t Type, o *Options) (Client, error) {
-	// TODO add default options / check for nil
-
-	switch t {
-	case TypeTCP:
-		return newTCPClient(o)
-	default:
-		return newTCPClient(o)
+	clientConstructor, exists := clientsMap[t]
+	if !exists {
+		return nil, errClientDoesNotExists
 	}
+
+	return clientConstructor(o)
 }

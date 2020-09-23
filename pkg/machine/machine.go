@@ -1,38 +1,49 @@
 package machine
 
-import (
-	"github.com/arckey/workerd/pkg/drivers"
+import "errors"
+
+// machine errors
+var (
+	ErrInvalidMachineState = errors.New("the machine is in invalid state")
 )
 
-// Machine a vm interface
-type Machine struct {
-	name   string
-	driver drivers.Driver
-}
+type (
+	// Machine represents a virtual machine
+	Machine interface {
+		// GetInfo gets information about the machine
+		GetInfo() (*MachineInfo, error)
 
-// GetByName tries to get a vm using the given driver
-func GetByName(name string, driver drivers.Driver) *Machine {
-	return &Machine{
-		name:   name,
-		driver: driver,
+		// Start the machine
+		Start() error
+
+		// Stop the machine
+		Stop() error
 	}
-}
 
-func (m *Machine) GetInfo() (*drivers.MachineInfo, error) {
-	return m.driver.GetMachineInfo(m.name)
-}
+	State string
 
-// Start starts the vm
-func (m *Machine) Start() error {
-	return m.driver.StartMachine(m.name)
-}
+	// MachineInfo holds information about a machine
+	MachineInfo struct {
+		Metadata struct {
+			Name string
+			ID   string
+			State
+		}
+		Spec struct {
+			OS     string
+			Memory int
+			VRAM   int
+			CPUs   int
+		}
+	}
+)
 
-// Stop stops the vm
-func (m *Machine) Stop() error {
-	return m.driver.StopMachine(m.name)
-}
-
-// Restart restarts the vm
-func (m *Machine) Restart() error {
-	return m.driver.RestartMachine(m.name)
-}
+// machine states
+const (
+	PoweroffState State = "poweroff"
+	RunningState        = "running"
+	PausedState         = "paused"
+	SavedState          = "saved"
+	AbortedState        = "aborted"
+	UnknownState        = "unknown"
+)

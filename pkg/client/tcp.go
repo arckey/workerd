@@ -33,6 +33,7 @@ func (c *tcpClient) Connect() error {
 		return err
 	}
 	c.conn = conn
+	go c.handleConnection()
 	return nil
 }
 
@@ -78,6 +79,7 @@ Loop:
 					Type: events.TypeStopMachine,
 					Data: nil,
 				}
+			case '\n': // ignore
 			default: // unknown event
 				c.c <- &events.Event{
 					Type: events.UnknownEventError,
